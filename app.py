@@ -70,7 +70,7 @@ st.subheader("Factor Loadings")
 col1, col2 = st.columns([3, 1])
 
 with col2:
-    if st.button("Reset to Defaults"):
+    if st.button("Add Noise..."):
         st.session_state.loadings_df = None
         st.rerun()
 
@@ -135,3 +135,4 @@ if st.button("Generate Data", type="primary"):
             
         except Exception as e:
             st.error(f"Generation failed: {str(e)}")
+
