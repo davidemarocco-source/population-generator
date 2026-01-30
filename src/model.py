@@ -79,7 +79,8 @@ class PopulationGenerator:
         self.sigma = self.model.get_covariance_matrix()
         self.mu = np.zeros(self.model.n_vars) # Assume mean 0 for simplicity
 
-    def generate(self, n_samples: int, seed: Optional[int] = None, likert_points: Optional[int] = None) -> pd.DataFrame:
+    def generate(self, n_samples: int, seed: Optional[int] = None, likert_points: Optional[int] = None, 
+                 mean: float = 0.0, std: float = 1.0) -> pd.DataFrame:
         """
         Generate N samples from the multivariate normal distribution defined by the model.
         
@@ -88,6 +89,8 @@ class PopulationGenerator:
             seed (int, optional): Random seed.
             likert_points (int, optional): If set (e.g., 5, 7), output will be discretized 
                                            to integers in range [1, likert_points].
+            mean (float): Population mean (shift). Default 0.0.
+            std (float): Population standard deviation (scale). Default 1.0.
         """
         if seed is not None:
             np.random.seed(seed)
@@ -103,12 +106,18 @@ class PopulationGenerator:
             self.sigma += np.eye(self.model.n_vars) * 1e-4
             data = np.random.multivariate_normal(self.mu, self.sigma, n_samples)
 
+        # Apply Population Mean and SD scaling
+        # data is currently N(0, Sigma). 
+        # We transform to N(Mean, SD^2 * Sigma)
+        data = data * std + mean
+
         if likert_points is not None and likert_points > 1:
             # Discretize data to 1..K
             # Underlying assumption: Data is N(0, 1) (if standardized)
-            # Range [-3, 3] covers 99.7% of data. 
-            # We map [-3, 3] to [1, K].
+            # If user shifted the mean/std, this will result in ceiling/floor effects or shifted distributions
+            # which is likely the intended behavior (e.g., "high ability population").
             
+            # Range [-3, 3] coverage of standard unit normal is mapped to the scale.
             # Width in sigmas: approx 6
             # Target width: K - 1
             scale_factor = (likert_points - 1) / 6.0
