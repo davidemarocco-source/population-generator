@@ -1,5 +1,6 @@
-numpy
+numpy<2.0.0
 pandas
 scipy
 streamlit
 altair<5
+
