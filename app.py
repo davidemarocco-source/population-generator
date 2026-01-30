@@ -133,6 +133,15 @@ st.session_state.loadings_df = edited_df
 
 # --- Generation ---
 st.markdown("---")
+# --- Generation ---
+st.markdown("---")
+
+# Initialize session state for generation results
+if "gen_df" not in st.session_state:
+    st.session_state.gen_df = None
+if "gen_success_msg" not in st.session_state:
+    st.session_state.gen_success_msg = None
+
 if st.button("Generate Data", type="primary"):
     with st.spinner("Generating population..."):
         try:
@@ -162,7 +171,7 @@ if st.button("Generate Data", type="primary"):
                     if rescale_strategy == "Use Fixed Reference (Comparison)" and st.session_state.get("ref_raw_mean") is not None:
                         current_mean = st.session_state.ref_raw_mean
                         current_std = st.session_state.ref_raw_std
-                        st.info(f"Using Fixed Reference Norms: Mean={current_mean:.2f}, SD={current_std:.2f}")
+                        st.session_state.gen_success_msg = f"Generated using Fixed Norms (Ref M={current_mean:.2f})."
                     else:
                         # Auto / Current Sample
                         current_mean = df_result['Total_Score'].mean()
@@ -170,47 +179,60 @@ if st.button("Generate Data", type="primary"):
                         # Save these for potential future reference
                         st.session_state.last_raw_mean = current_mean
                         st.session_state.last_raw_std = current_std
+                        st.session_state.gen_success_msg = f"Generated using current sample norms."
                     
                     # Z-score normalization using the determined norms
                     z_scores = (df_result['Total_Score'] - current_mean) / current_std
                     
                     df_result['Scaled_Score'] = z_scores * target_std + target_mean
                     df_result['Scaled_Score'] = df_result['Scaled_Score'].round(2)
+            else:
+                 st.session_state.gen_success_msg = f"Generated {n_samples} subjects successfully!"
 
-            # 6. Success UI
-            st.success(f"Generated {n_samples} subjects successfully!")
-            
-            # 7. Helper to set Reference
-            # Logic Change: Button needs to persist the state. 
-            # In Streamlit, buttons return True only on the click run.
-            # We want to allow setting it from connection 1.
-            
-            if rescale_sum and rescale_strategy == "Current Sample (Auto)":
-                if st.button("❄️ Set Current Stats as Fixed Reference"):
-                    st.session_state.ref_raw_mean = df_result['Total_Score'].mean()
-                    st.session_state.ref_raw_std = df_result['Total_Score'].std()
-                    # Rerun to update sidebar
-                    st.rerun()
-
-            if rescale_sum and rescale_strategy == "Use Fixed Reference (Comparison)" and st.button("Reset Reference"):
-                 st.session_state.ref_raw_mean = None
-                 st.session_state.ref_raw_std = None
-                 st.rerun()
-            
-            # Preview
-            st.dataframe(df_result.head(), use_container_width=True)
-            
-            # Download
-            csv = df_result.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="Download CSV",
-                data=csv,
-                file_name="population_data.csv",
-                mime="text/csv",
-            )
+            # Store in session state
+            st.session_state.gen_df = df_result
             
         except Exception as e:
             st.error(f"Generation failed: {str(e)}")
+
+# --- Result Display ---
+# Only show if data exists in session state
+if st.session_state.gen_df is not None:
+    df_show = st.session_state.gen_df
+    
+    if st.session_state.gen_success_msg:
+        st.success(st.session_state.gen_success_msg)
+
+    # 7. Helper to set Reference
+    # Logic Change: Button needs to persist the state. 
+    # Move outside the generate block so it persists
+    
+    if calc_sum and rescale_sum and rescale_strategy == "Current Sample (Auto)":
+        if st.button("❄️ Set Current Stats as Fixed Reference"):
+            # Use the stored last_raw_mean which was computed during generation
+            if st.session_state.get("last_raw_mean") is not None:
+                st.session_state.ref_raw_mean = st.session_state.last_raw_mean
+                st.session_state.ref_raw_std = st.session_state.last_raw_std
+                # Rerun to update sidebar
+                st.rerun()
+
+    if calc_sum and rescale_sum and rescale_strategy == "Use Fixed Reference (Comparison)":
+         if st.button("Reset Reference"):
+             st.session_state.ref_raw_mean = None
+             st.session_state.ref_raw_std = None
+             st.rerun()
+    
+    # Preview
+    st.dataframe(df_show.head(), use_container_width=True)
+    
+    # Download
+    csv = df_show.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download CSV",
+        data=csv,
+        file_name="population_data.csv",
+        mime="text/csv",
+    )
 
 
 
