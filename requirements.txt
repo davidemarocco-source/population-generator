@@ -2,4 +2,4 @@ numpy
 pandas
 scipy
 streamlit
-watchdog
+altair<5
