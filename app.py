@@ -52,6 +52,19 @@ if rescale_sum:
     col_t1, col_t2 = st.sidebar.columns(2)
     target_mean = col_t1.number_input("Target Mean", value=100.0)
     target_std = col_t2.number_input("Target SD", value=15.0)
+    
+    st.sidebar.markdown("**Rescaling Strategy**")
+    rescale_strategy = st.sidebar.radio(
+        "Strategy", 
+        ["Current Sample (Auto)", "Use Fixed Reference (Comparison)"],
+        label_visibility="collapsed"
+    )
+    
+    if rescale_strategy == "Use Fixed Reference (Comparison)":
+        if st.session_state.get("ref_raw_mean") is None:
+            st.sidebar.error("No reference set! Generate a sample first and click 'Set Current Stats as Fixed Reference'.")
+        else:
+            st.sidebar.success(f"Ref: M={st.session_state.ref_raw_mean:.1f}, SD={st.session_state.ref_raw_std:.1f}")
 
 st.sidebar.markdown("---")
 noise_level = st.sidebar.slider("Loading Noise", 0.0, 1.0, 0.0, 0.01, help="Random noise added to the factor loadings")
@@ -145,9 +158,20 @@ if st.button("Generate Data", type="primary"):
                 df_result['Total_Score'] = df_result.iloc[:, :n_vars].sum(axis=1) # Sum items only
                 
                 if rescale_sum:
-                    current_mean = df_result['Total_Score'].mean()
-                    current_std = df_result['Total_Score'].std()
-                    # Z-score normalization
+                    # Determine Norms (Mean/SD to subtract/divide)
+                    if rescale_strategy == "Use Fixed Reference (Comparison)" and st.session_state.get("ref_raw_mean") is not None:
+                        current_mean = st.session_state.ref_raw_mean
+                        current_std = st.session_state.ref_raw_std
+                        st.info(f"Using Fixed Reference Norms: Mean={current_mean:.2f}, SD={current_std:.2f}")
+                    else:
+                        # Auto / Current Sample
+                        current_mean = df_result['Total_Score'].mean()
+                        current_std = df_result['Total_Score'].std()
+                        # Save these for potential future reference
+                        st.session_state.last_raw_mean = current_mean
+                        st.session_state.last_raw_std = current_std
+                    
+                    # Z-score normalization using the determined norms
                     z_scores = (df_result['Total_Score'] - current_mean) / current_std
                     
                     df_result['Scaled_Score'] = z_scores * target_std + target_mean
@@ -155,6 +179,13 @@ if st.button("Generate Data", type="primary"):
 
             # 6. Success UI
             st.success(f"Generated {n_samples} subjects successfully!")
+            
+            # 7. Helper to set Reference
+            if rescale_sum and rescale_strategy == "Current Sample (Auto)":
+                if st.button("❄️ Set Current Stats as Fixed Reference"):
+                    st.session_state.ref_raw_mean = st.session_state.last_raw_mean
+                    st.session_state.ref_raw_std = st.session_state.last_raw_std
+                    st.success(f"Reference Frozen! Mean={st.session_state.ref_raw_mean:.2f}, SD={st.session_state.ref_raw_std:.2f}. You can now switch to 'Use Fixed Reference'.")
             
             # Preview
             st.dataframe(df_result.head(), use_container_width=True)
