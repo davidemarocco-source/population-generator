@@ -181,11 +181,21 @@ if st.button("Generate Data", type="primary"):
             st.success(f"Generated {n_samples} subjects successfully!")
             
             # 7. Helper to set Reference
+            # Logic Change: Button needs to persist the state. 
+            # In Streamlit, buttons return True only on the click run.
+            # We want to allow setting it from connection 1.
+            
             if rescale_sum and rescale_strategy == "Current Sample (Auto)":
                 if st.button("❄️ Set Current Stats as Fixed Reference"):
-                    st.session_state.ref_raw_mean = st.session_state.last_raw_mean
-                    st.session_state.ref_raw_std = st.session_state.last_raw_std
-                    st.success(f"Reference Frozen! Mean={st.session_state.ref_raw_mean:.2f}, SD={st.session_state.ref_raw_std:.2f}. You can now switch to 'Use Fixed Reference'.")
+                    st.session_state.ref_raw_mean = df_result['Total_Score'].mean()
+                    st.session_state.ref_raw_std = df_result['Total_Score'].std()
+                    # Rerun to update sidebar
+                    st.rerun()
+
+            if rescale_sum and rescale_strategy == "Use Fixed Reference (Comparison)" and st.button("Reset Reference"):
+                 st.session_state.ref_raw_mean = None
+                 st.session_state.ref_raw_std = None
+                 st.rerun()
             
             # Preview
             st.dataframe(df_result.head(), use_container_width=True)
